@@ -9,11 +9,16 @@
 // Note :  All credit shall be given to Solarduino.
 
 /*/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/////////////*/
-
+const int sensorPin = 2;  // Use a pin that supports interrupts (e.g., pin 2)
+volatile int pulseCount = 0;  // Use volatile for variables accessed within an interrupt
+unsigned long lastTime = 0;
+int rpm = 0;
+float distanceTraveled = 0.0;  // in kilometers
+const int rotationsPerKilometer = 200;
 
 /* 0- General */
 
-        int decimalPrecision = 2;                   // decimal places for all values shown in LED Display & Serial Monitor
+        int decimalPrecision = 1;                   // decimal places for all values shown in LED Display & Serial Monitor
     
 /* 1- DC Voltage Measurement using Voltage Divider Method */
 
@@ -85,6 +90,7 @@
 void setup()                                  /* The Codes only run 1 time only when Arduino started.*/
  
   {
+    attachInterrupt(digitalPinToInterrupt(sensorPin), countPulse, FALLING);
 
 /* 0- General */
 
@@ -234,7 +240,7 @@ void loop()                                 /* The Codes run repeatly over and o
             wattHour = PowerValue/3600*(periodEnergy/1000);                                                       /* for smoothing calculation*/
             FinalEnergyValue = FinalEnergyValue + wattHour;
             Serial.print("E : " );
-            Serial.print(FinalEnergyValue,decimalPrecision); 
+            Serial.print(FinalEnergyValue,decimalPrecision-1); 
             Serial.print(" Wh "); 
             Serial.println(" /  ");
             startMillisEnergy = currentMillisEnergy ;                                                             /* Set the starting point again for next counting time */
@@ -248,17 +254,46 @@ void loop()                                 /* The Codes run repeatly over and o
             LCD.setCursor(0,0);                                                                                   /* Set cursor to first colum 0 and second row 1  */
             LCD.print(finalVoltage,decimalPrecision);                                                             /* display voltage value in LCD in first row  */
             LCD.print("V   ");
-            LCD.setCursor(8,0);   
+            LCD.setCursor(5,0);   
             LCD.print(PowerValue,decimalPrecision-1);                                                             /* display power value in LCD  */
             LCD.print("W    ");
             LCD.setCursor(0,1);                                                                                   /* set display starts at second row  */
             LCD.print(finalCurrent2,decimalPrecision);                                                             /* display current value in LCD in first row */
             LCD.print("A  ");  
-            LCD.setCursor(8,1);
+            LCD.setCursor(6,1);
             LCD.print(FinalEnergyValue,decimalPrecision-1);                                                  /* display energy value in LCD  */
             LCD.print("Wh   ");
             startMillisLCD = currentMillisLCD ;                                                                   /* Set the starting point again for next counting time */
           }
 
- 
+ if (millis() - lastTime >= 1000) {
+    rpm = (pulseCount * 60) / 20;  // Calculate RPM: (pulses * 60 seconds) / pulses per revolution
+    Serial.print("RPM: ");
+    Serial.print(rpm);
+
+    // Calculate distance traveled during the last second
+    float rotations = pulseCount / 20.0;  // Convert pulses to rotations
+    float distanceIncrement = (rotations / rotationsPerKilometer) * 1.0;  // Assume 200 rotations = 1 km
+    distanceTraveled += distanceIncrement;
+    
+    Serial.print("\tDistance: ");
+    Serial.print(distanceTraveled);
+    Serial.println(" km");
+
+            LCD.setCursor(10,0);                                                                                   /* set display starts at second row  */
+            LCD.print(rpm,decimalPrecision);                                                             /* display current value in LCD in first row */
+            LCD.print("rpm  ");  
+            LCD.setCursor(11,1);
+            LCD.print(distanceTraveled,decimalPrecision-1);                                                  /* display energy value in LCD  */
+            LCD.print("km");
+    // Reset pulse count and update the last time
+    pulseCount = 0;
+    lastTime = millis();
   }
+  }
+
+  void countPulse() {
+  pulseCount++;
+  // Uncomment the next line for debugging purposes
+  // Serial.println("Interrupt!");
+}
